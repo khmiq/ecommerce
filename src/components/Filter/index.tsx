@@ -1,15 +1,13 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
-import axios from "axios";
-import { Input } from "../ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { Button } from "../ui/button";
-import { ProductCard } from "../Card";
-import { Skeleton } from "../ui/skeleton";
-import toast from "react-hot-toast";
+import { useState, useEffect } from 'react';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Card } from '../ui/card';
+import { motion } from 'framer-motion';
+import { toast } from 'react-hot-toast';
+import { ProductCard } from '../Card';
 
-const API_BASE = "https://keldibekov.online";
 
 type Category = {
   id: string;
@@ -19,250 +17,386 @@ type Category = {
 type Color = {
   id: string;
   name: string;
+  hexCode: string;
 };
 
 type Product = {
   id: string;
   name: string;
   price: number;
-  category: Category;
-  color: Color;
-  imageUrl: string;
-  rating: number;
+  description: string;
+  img: string;
+  colorIds: Color[];
+  colors?: Color[];
+  category: {
+    id: string;
+    name: string;
+  };
+  avgStars: string;
+  createdAt: string;
+  discountedPrice?: number;
 };
 
-const fetchCategories = async (): Promise<Category[]> => {
-  const { data } = await axios.get(`${API_BASE}/category`);
-  return Array.isArray(data) ? data : [];
+type FilterParams = {
+  name?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  categoryId?: string;
+  colorId?: string;
+  page?: number;
+  limit?: number;
 };
 
-const fetchColors = async (): Promise<Color[]> => {
-  const { data } = await axios.get(`${API_BASE}/color`);
-  return Array.isArray(data) ? data : [];
-};
-
-const fetchProducts = async (params: URLSearchParams): Promise<Product[]> => {
-  const queryParams = Object.fromEntries(params.entries());
-  const { data } = await axios.get(`${API_BASE}/products`, { params: queryParams });
-  return Array.isArray(data) ? data : [];
-};
-
-export const Filter = () => {
-  // const _queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
-  
-  // Initialize state from URL params
-  const [localFilters, setLocalFilters] = useState({
-    search: searchParams.get("search") || "",
-    minPrice: searchParams.get("minPrice") || "",
-    maxPrice: searchParams.get("maxPrice") || "",
-    categoryId: searchParams.get("categoryId") || "all",
-    colorId: searchParams.get("colorId") || "all",
+// type ApiResponse<T> = {
+//   data?: T;
+//   error?: string;
+//   success: boolean;
+//  };
+const Filter = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [colors, setColors] = useState<Color[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [filters, setFilters] = useState<FilterParams>({
+    page: 1,
+    limit: 12,
   });
-  
-  const [sortBy, setSortBy] = useState(searchParams.get("sortBy") || "price");
-  const [localLikes, setLocalLikes] = useState<Record<string, boolean>>({});
 
-  // Sync state with URL params on mount
+  //Fetch categories
+  // useEffect(() => {
+  //   const fetchCategories = async () => {
+  //     try {
+  //       const response = await fetch('https://keldibekov.online/category?page=1&limit=10');
+  //       const result: ApiResponse<Category[]> = await response.json();
+
+  //       if (result.success && result.data) {
+  //         setCategories(result.data);
+  //       } else {
+  //         toast.error(result.error || 'Failed to fetch categories');
+  //       }
+  //     } catch (error) {
+  //       toast.error('Network error while fetching categories');
+  //       console.error('Error fetching categories:', error);
+  //     }
+  //   };
+
+  //   fetchCategories();
+  // }, []);
   useEffect(() => {
-    setLocalFilters({
-      search: searchParams.get("search") || "",
-      minPrice: searchParams.get("minPrice") || "",
-      maxPrice: searchParams.get("maxPrice") || "",
-      categoryId: searchParams.get("categoryId") || "all",
-      colorId: searchParams.get("colorId") || "all",
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('https://keldibekov.online/category?page=1&limit=10', {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('API Response:', result);
+  
+        // The response has data directly in "data" property
+        if (result.data) {
+          setCategories(result.data);
+        } else {
+          toast.error('No categories found in response');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        toast.error(error instanceof Error ? error.message : 'Network error while fetching categories');
+      }
+    };
+  
+    fetchCategories();
+  }, []);
+ 
+
+ 
+
+  // Fetch colors
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch('https://keldibekov.online/color');
+        const result = await response.json();
+
+        if (Array.isArray(result)) {
+          setColors(result);
+        } else if (result.data && Array.isArray(result.data)) {
+          setColors(result.data);
+        } else if (result.colors && Array.isArray(result.colors)) {
+          setColors(result.colors);
+        } else {
+          toast.error('Unexpected colors data format');
+          console.error('Unexpected colors response:', result);
+          setColors([]);
+        }
+      } catch (error) {
+        toast.error('Failed to fetch colors');
+        console.error('Error fetching colors:', error);
+        setColors([]);
+      }
+    };
+
+    fetchColors();
+  }, []);
+
+  // Fetch products
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const queryParams = new URLSearchParams();
+
+        if (filters.name) queryParams.append('name', filters.name);
+        if (filters.minPrice) queryParams.append('minPrice', filters.minPrice.toString());
+        if (filters.maxPrice) queryParams.append('maxPrice', filters.maxPrice.toString());
+        if (filters.categoryId) queryParams.append('categoryId', filters.categoryId);
+        if (filters.colorId) queryParams.append('colorId', filters.colorId);
+        queryParams.append('page', filters.page?.toString() || '1');
+        queryParams.append('limit', filters.limit?.toString() || '12');
+
+        const response = await fetch(`https://keldibekov.online/products?${queryParams.toString()}`);
+        const result = await response.json();
+
+        if (Array.isArray(result)) {
+          setProducts(result);
+          setTotalPages(1);
+        } else if (result.products && Array.isArray(result.products)) {
+          setProducts(result.products);
+          setTotalPages(result.totalPages || 1);
+          setPage(result.currentPage || 1);
+        } else {
+          toast.error('Unexpected products data format');
+          console.error('Unexpected products response:', result);
+          setProducts([]);
+        }
+      } catch (error) {
+        toast.error('Failed to fetch products');
+        console.error('Error fetching products:', error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [filters]);
+
+  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value,
+      page: 1,
+    }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [name]: value === 'all' ? undefined : value,
+      page: 1,
+    }));
+  };
+
+  const handlePriceChange = (type: 'min' | 'max', value: string) => {
+    const numValue = value ? parseFloat(value) : undefined;
+    setFilters(prev => ({
+      ...prev,
+      [`${type}Price`]: numValue,
+      page: 1,
+    }));
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      page: 1,
+      limit: 12,
     });
-    setSortBy(searchParams.get("sortBy") || "price");
-  }, [searchParams]);
+  };
 
-  // Fetch data
-  const { 
-    data: categories = [], 
-    isLoading: loadingCategories,
-    error: _categoriesError
-  } = useQuery<Category[]>({
-    queryKey: ["categories"],
-    queryFn: fetchCategories,
-    staleTime: 60 * 1000,
-  });
-
-  const { 
-    data: colors = [], 
-    isLoading: loadingColors,
-    error: _colorsError
-  } = useQuery<Color[]>({
-    queryKey: ["colors"],
-    queryFn: fetchColors,
-    staleTime: 60 * 1000,
-  });
-
-  const { 
-    data: products = [], 
-    isLoading: loadingProducts, 
-    isError: productsError
-  } = useQuery<Product[]>({
-    queryKey: ["products", searchParams.toString()],
-    queryFn: () => fetchProducts(searchParams),
-    retry: 2,
-  });
-
-  const applyFilters = useCallback(() => {
-    const params = new URLSearchParams();
-    
-    if (localFilters.search) params.set("search", localFilters.search);
-    if (localFilters.minPrice) params.set("minPrice", localFilters.minPrice);
-    if (localFilters.maxPrice) params.set("maxPrice", localFilters.maxPrice);
-    if (localFilters.categoryId !== "all") params.set("categoryId", localFilters.categoryId);
-    if (localFilters.colorId !== "all") params.set("colorId", localFilters.colorId);
-    params.set("sortBy", sortBy);
-    
-    setSearchParams(params);
-    toast.success("Filters applied");
-  }, [localFilters, sortBy, setSearchParams]);
-
-  const resetFilters = useCallback(() => {
-    setSearchParams(new URLSearchParams());
-    toast.success("Filters reset");
-  }, [setSearchParams]);
-
-  const handleInputChange = useCallback((field: string, value: string) => {
-    setLocalFilters(prev => ({ ...prev, [field]: value }));
-  }, []);
-
-  const addToCart = useCallback((productId: string) => {
-    console.log("Added to cart:", productId);
-    toast.success("Product added to cart");
-  }, []);
-
-  const toggleLike = useCallback((productId: string) => {
-    setLocalLikes(prev => ({ ...prev, [productId]: !prev[productId] }));
-  }, []);
-
-  const isLoading = useMemo(
-    () => loadingCategories || loadingColors || loadingProducts,
-    [loadingCategories, loadingColors, loadingProducts]
-  );
-
-  const renderProductGrid = useMemo(() => {
-    if (isLoading) {
-      return Array(8).fill(0).map((_, index) => (
-        <Skeleton key={index} className="h-64 w-full rounded-md" />
-      ));
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setFilters(prev => ({
+        ...prev,
+        page: newPage,
+      }));
     }
+  };
 
-    if (productsError) {
-      return <div className="col-span-full text-center text-red-500">Error loading products</div>;
-    }
-
-    if (products.length === 0) {
-      return <div className="col-span-full text-center">No products found</div>;
-    }
-
-    return products.map((product) => (
-      <ProductCard
-        key={product.id}
-        product={product}
-        isLiked={!!localLikes[product.id]}
-        onToggleLike={() => toggleLike(product.id)}
-        onAddToCart={() => addToCart(product.id)}
-      />
-    ));
-  }, [isLoading, productsError, products, localLikes, toggleLike, addToCart]);
+  const mockToggleLike = () => {};
+  const mockAddToCart = () => {};
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="p-6 bg-white shadow-md rounded-md mb-8 space-y-4">
-        <h2 className="text-xl font-bold mb-4">Filter Products</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Input
-            placeholder="Search products..."
-            value={localFilters.search}
-            onChange={(e) => handleInputChange('search', e.target.value)}
+    <div className="container mx-auto px-4 py-8">
+      <Card className="p-6 mb-8">
+        <h2 className="text-2xl font-bold mb-6">Filter Products</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Name filter */}
+          <div>
+            <Label htmlFor="name">Product Name</Label>
+            <Input
+              id="name"
+              name="name"
+              type="text"
+              placeholder="Search by name"
+              value={filters.name || ''}
+              onChange={handleFilterChange}
+            />
+          </div>
+
+          {/* Price range */}
+          <div>
+            <Label>Price Range</Label>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Min price"
+                value={filters.minPrice || ''}
+                onChange={(e) => handlePriceChange('min', e.target.value)}
+                min="0"
+              />
+              <Input
+                type="number"
+                placeholder="Max price"
+                value={filters.maxPrice || ''}
+                onChange={(e) => handlePriceChange('max', e.target.value)}
+                min="0"
+              />
+            </div>
+          </div>
+
+          {/* Category filter */}
+          <div>
+            <Label htmlFor="category">Category</Label>
+            <Select
+              value={filters.categoryId || 'all'}
+              onValueChange={(value) => handleSelectChange('categoryId', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Color filter (fixed key warning) */}
+          <div>
+            <Label htmlFor="color">Color</Label>
+            <Select
+              value={filters.colorId || 'all'}
+              onValueChange={(value) => handleSelectChange('colorId', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select color" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Colors</SelectItem>
+                {Array.isArray(colors) &&
+  colors.map((color) => {
+    if (typeof color.id !== 'string') return null;
+
+    return (
+      <SelectItem key={`color-${color.id}`} value={color.id}>
+        <div className="flex items-center gap-2">
+          <span
+            className="w-4 h-4 rounded-full inline-block"
+            style={{ backgroundColor: color.hexCode || '#ccc' }}
           />
+          {color.name || 'Unnamed'}
+        </div>
+      </SelectItem>
+    );
+  })}
 
-          <Input
-            type="number"
-            placeholder="Min Price"
-            value={localFilters.minPrice}
-            onChange={(e) => handleInputChange('minPrice', e.target.value)}
-            min="0"
-          />
-
-          <Input
-            type="number"
-            placeholder="Max Price"
-            value={localFilters.maxPrice}
-            onChange={(e) => handleInputChange('maxPrice', e.target.value)}
-            min={localFilters.minPrice || "0"}
-          />
-
-          <Select 
-            value={localFilters.categoryId} 
-            onValueChange={(value) => handleInputChange('categoryId', value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select 
-            value={localFilters.colorId} 
-            onValueChange={(value) => handleInputChange('colorId', value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="All Colors" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Colors</SelectItem>
-              {colors.map((color) => (
-                <SelectItem key={color.id} value={color.id}>
-                  {color.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger>
-              <SelectValue placeholder="Sort By" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="price">Price</SelectItem>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="createdAt">Newest</SelectItem>
-              <SelectItem value="rating">Rating</SelectItem>
-            </SelectContent>
-          </Select>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="flex justify-end gap-2">
-          <Button 
-            variant="outline"
-            onClick={resetFilters}
-          >
-            Reset
+        <div className="flex justify-end mt-6 gap-4">
+          <Button variant="outline" onClick={resetFilters}>
+            Reset Filters
           </Button>
-          <Button 
-            onClick={applyFilters}
-            disabled={isLoading}
-          >
+          <Button onClick={() => setFilters(prev => ({ ...prev, page: 1 }))}>
             Apply Filters
           </Button>
         </div>
-      </div>
+      </Card>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {renderProductGrid}
-      </div>
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      ) : products.length === 0 ? (
+        <div className="text-center py-12">
+          <h3 className="text-xl font-medium">No products found</h3>
+          <p className="text-muted-foreground">Try adjusting your filters</p>
+        </div>
+      ) : (
+        <>
+          <motion.div
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            {products.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                isLiked={false}
+                onToggleLike={mockToggleLike}
+                onAddToCart={mockAddToCart}
+              />
+            ))}
+          </motion.div>
+
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-8 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <Button
+                  key={pageNum}
+                  variant={pageNum === page ? 'default' : 'outline'}
+                  onClick={() => handlePageChange(pageNum)}
+                >
+                  {pageNum}
+                </Button>
+              ))}
+
+              <Button
+                variant="outline"
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
