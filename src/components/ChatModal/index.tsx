@@ -157,15 +157,14 @@ type Message = {
 
 type ChatModalProps = {
   productId: string;
-  sellerEmail: string;
+//   sellerEmail: string;
   sellerName: string;
   currentUserId: string;
   children: React.ReactNode;
 };
 
 export const ChatModal = ({ 
-  productId, 
-  sellerEmail, 
+  productId,  
   sellerName, 
   currentUserId,
   children 

@@ -147,7 +147,7 @@ const ReviewForm = ({ productId }: { productId: string }) => {
   );
 };
 
-const ReviewList = ({ comments }: { comments: Comment[] }) => {
+ export const ReviewList = ({ comments }: { comments: Comment[] }) => {
   if (comments.length === 0) {
     return (
       <div className="text-center py-8 bg-gray-50 rounded-lg">
@@ -232,8 +232,8 @@ export const ProductDetail = () => {
 
   const { 
     data: colors = [], 
-    isLoading: isLoadingColors,
-    isError: isColorsError 
+    // isLoading: isLoadingColors,
+    // isError: isColorsError 
   } = useQuery<Color[]>({
     queryKey: ['colors'],
     queryFn: async () => {
@@ -244,7 +244,7 @@ export const ProductDetail = () => {
   });
 
   const productColor = colors.find(color => color.id) || product?.color;
-
+ const currentUserId = "675abe14-8c68-4cac-a768-c258745aa972"
   const handleAddToCart = () => {
     if (!product) return;
     toast.success(`${product.name} added to cart`, {
@@ -622,8 +622,9 @@ export const ProductDetail = () => {
           </Button> */}
           <ChatModal 
   productId={product.id}
-  sellerEmail={product.user?.email}
+  // sellerEmail={product.user?.email}
   sellerName={sellerName}
+  currentUserId={currentUserId}
 >
   <Button variant="outline" className="w-full">
     <MessageSquare className="w-4 h-4 mr-2" />
