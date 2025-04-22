@@ -5,6 +5,8 @@ import { Toaster } from 'react-hot-toast'
 import Navbar from './components/Navbar'
 import FilterSort from './components/Filter'
 import {ProductDetail} from './components/ProductDetail'
+import Login from './components/Login/index'
+import { Profile } from './components/Profile/Profile'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,6 +26,8 @@ function App() {
           <Routes>
             <Route path="/" element={<FilterSort />} />
             <Route path="/products/:productId" element={<ProductDetail />} />
+            <Route path='/login' element={<Login />}/>
+            <Route path="/profile" element={<Profile />} />
             <Route path="*" element={<div>Page Not Found</div>} />
           </Routes>
         </main>

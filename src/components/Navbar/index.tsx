@@ -1,11 +1,15 @@
+// src/components/Header.tsx
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import clsx from "clsx";
+import { useUserStore } from "../store/useStore";
 
-const Navbar: React.FC = () => {
+const Header: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { user, logout } = useUserStore(); // Access user state and logout action
+  const navigate = useNavigate();
 
   const navItems = [
     { name: "Phone", path: "/phone" },
@@ -13,6 +17,12 @@ const Navbar: React.FC = () => {
     { name: "Laptops", path: "/laptops" },
     { name: "Accessories", path: "/accessories" },
   ];
+
+  const handleLogout = () => {
+    logout();
+    setIsOpen(false); // Close mobile menu on logout
+    navigate("/");
+  };
 
   return (
     <nav className="fixed top-0 left-0 w-full bg-[#111] text-white shadow-lg z-50">
@@ -47,15 +57,38 @@ const Navbar: React.FC = () => {
           ))}
         </div>
 
-        {/* LOGIN BUTTON */}
-        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-          <Link
-            to="/login"
-            className="hidden md:block bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-white font-semibold transition-all"
-          >
-            Login
-          </Link>
-        </motion.div>
+        {/* AUTH SECTION - DESKTOP */}
+        <div className="hidden md:flex items-center space-x-4">
+          {user ? (
+            <>
+              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                <Link
+                  to="/profile"
+                  className="text-lg font-semibold hover:text-gray-400 transition-all duration-300"
+                >
+                  {user.email.split("@")[0]} {/* Display username part of email */}
+                </Link>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-white font-semibold transition-all"
+                >
+                  Logout
+                </button>
+              </motion.div>
+            </>
+          ) : (
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+              <Link
+                to="/login"
+                className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-white font-semibold transition-all"
+              >
+                Login
+              </Link>
+            </motion.div>
+          )}
+        </div>
 
         {/* HAMBURGER MENU - MOBILE */}
         <div className="md:hidden">
@@ -88,20 +121,44 @@ const Navbar: React.FC = () => {
           </motion.div>
         ))}
         <div className="text-center mt-4">
-          <Link
-            to="/login"
-            className="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg text-white font-semibold transition-all"
-            onClick={() => setIsOpen(false)}
-          >
-            Login
-          </Link>
+          {user ? (
+            <>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 200 }}
+                className="py-2"
+              >
+                <Link to="/profile" onClick={() => setIsOpen(false)}>
+                  {user.email.split("@")[0]}
+                </Link>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} transition={{ type: "spring", stiffness: 200 }}>
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-500 hover:bg-red-600 px-6 py-2 rounded-lg text-white font-semibold transition-all"
+                >
+                  Logout
+                </button>
+              </motion.div>
+            </>
+          ) : (
+            <motion.div whileHover={{ scale: 1.05 }} transition={{ type: "spring", stiffness: 200 }}>
+              <Link
+                to="/login"
+                className="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg text-white font-semibold transition-all"
+                onClick={() => setIsOpen(false)}
+              >
+                Login
+              </Link>
+            </motion.div>
+          )}
         </div>
       </motion.div>
     </nav>
   );
 };
 
-export default Navbar;
+export default Header;
 
 
 // src/pages/Profile.tsx
